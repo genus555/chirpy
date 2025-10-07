@@ -1,3 +1,25 @@
 package main
 
-import ()
+import (
+	"net/http"
+)
+
+func launchServer() {
+	mux := http.NewServeMux()
+	mux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir("./pages"))))
+	mux.Handle("/app/pages/", http.StripPrefix("/app/pages/", http.FileServer(http.Dir("./pages"))))
+	mux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("./assets"))))
+	mux.HandleFunc("/healthz", muxHandler)
+
+	s := &http.Server{
+		Handler:	mux,
+		Addr:		":8080",
+	}
+
+	s.ListenAndServe()
+}
+func muxHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(200)
+	w.Write([]byte("OK"))
+}
