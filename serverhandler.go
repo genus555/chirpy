@@ -1,15 +1,19 @@
 package main
 
 import (
+	//"fmt"
 	"net/http"
 )
 
-func launchServer() {
+func launchServer(cfg *apiConfig) {
 	mux := http.NewServeMux()
-	mux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir("./pages"))))
+	mux.Handle("/app/", 
+	cfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("./pages")))))
 	mux.Handle("/app/pages/", http.StripPrefix("/app/pages/", http.FileServer(http.Dir("./pages"))))
 	mux.Handle("/app/assets/", http.StripPrefix("/app/assets/", http.FileServer(http.Dir("./assets"))))
-	mux.HandleFunc("/healthz", muxHandler)
+	mux.HandleFunc("GET /metrics", cfg.middlewarePrintMetrics)
+	mux.HandleFunc("POST /reset", cfg.middlewareResetMetrics)
+	mux.HandleFunc("GET /healthz", muxHandler)
 
 	s := &http.Server{
 		Handler:	mux,
