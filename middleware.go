@@ -4,6 +4,8 @@ import(
 	"net/http"
 	"log"
 	"fmt"
+	"encoding/json"
+	"strings"
 )
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -14,11 +16,6 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(f)
 }
-
-/*func (cfg *apiConfig) middlewarePrintMetrics(w http.ResponseWriter, r *http.Request) {
-	hits := cfg.fileserverHits.Load()
-	w.Write([]byte(fmt.Sprintf("Hits: %d\n", hits)))
-}*/
 
 func (cfg *apiConfig) middlewarePrintMetrics(w http.ResponseWriter, r *http.Request) {
 	hits := cfg.fileserverHits.Load()
@@ -40,4 +37,25 @@ func middlewareLog(next http.Handler) http.Handler {
 		log.Printf("%s %s", r.Method, r.URL.Path)
 		next.ServeHTTP(w, r)
 	})
+}
+
+func EncodeJSON(r *PostRequest) ([]byte, error) {
+	d, err := json.Marshal(r)
+	if err != nil {return d, err}
+
+	return d, nil
+}
+
+func checkBadWords(r *PostRequest) {
+	nonoWords := [3]string{"kerfuffle", "sharbert", "fornax"}
+
+	b := strings.Split(r.Body, " ")
+	for i, word := range b {
+		for _, badWord := range nonoWords {
+			if strings.ToLower(word) == badWord {
+				b[i] = "****"
+			}
+		}
+	}
+	r.CleanedBody = strings.Join(b, " ")
 }
