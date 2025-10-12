@@ -12,6 +12,7 @@ type PostRequest struct {
 		CleanedBody string	`json:"cleaned_body"`
 		Error 		string 	`json:"error"`
 		Valid 		bool 	`json:"valid"`
+		Email		string	`json:"email"`
 	}
 
 func launchServer(cfg *apiConfig) {

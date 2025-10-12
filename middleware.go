@@ -30,6 +30,10 @@ func (cfg *apiConfig) middlewarePrintMetrics(w http.ResponseWriter, r *http.Requ
 
 func (cfg *apiConfig) middlewareResetMetrics(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Store(int32(0))
+	err := cfg.db.DeleteUsers(r.Context())
+	if err != nil {
+		log.Printf("Error deleting users: %s", err)
+	}
 }
 
 func middlewareLog(next http.Handler) http.Handler {
@@ -39,7 +43,7 @@ func middlewareLog(next http.Handler) http.Handler {
 	})
 }
 
-func EncodeJSON(r *PostRequest) ([]byte, error) {
+func EncodeJSON(r interface{}) ([]byte, error) {
 	d, err := json.Marshal(r)
 	if err != nil {return d, err}
 
@@ -58,4 +62,13 @@ func checkBadWords(r *PostRequest) {
 		}
 	}
 	r.CleanedBody = strings.Join(b, " ")
+}
+
+func recievePostRequest(w http.ResponseWriter, r *http.Request) (PostRequest, error) {
+	d := json.NewDecoder(r.Body)
+	req := PostRequest{}
+	err := d.Decode(&req)
+	if err != nil {return PostRequest{}, err}
+
+	return req, nil
 }

@@ -1,18 +1,36 @@
 package main
 
+import _ "github.com/lib/pq"
+
 import (
 	//"fmt"
+	"github.com/joho/godotenv"
+	"github.com/genus555/chirpy.git/internal/database"
 	"sync/atomic"
+	"os"
+	"log"
+	"database/sql"
 )
 
 type apiConfig struct {
-	fileserverHits atomic.Int32
+	fileserverHits	atomic.Int32
+	db			*database.Queries
 }
 func main() {
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Print(err)
+	}
+	dbQueries := database.New(db)
+
 	var serverHits atomic.Int32
 	initializeHits(&serverHits)
 	cfg := apiConfig{
 		fileserverHits: serverHits,
+		db:		dbQueries,
 	}
 	launchServer(&cfg);
 }
