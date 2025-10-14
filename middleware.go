@@ -6,6 +6,7 @@ import(
 	"fmt"
 	"encoding/json"
 	"strings"
+	"github.com/genus555/chirpy.git/internal/database"
 )
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -71,4 +72,34 @@ func recievePostRequest(w http.ResponseWriter, r *http.Request) (PostRequest, er
 	if err != nil {return PostRequest{}, err}
 
 	return req, nil
+}
+
+func (cfg *apiConfig) recieveChirp(req PostRequest, r *http.Request) (Chirp, error) {
+	c, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
+		Body:		req.Body,
+		UserID:		req.UserID,
+	})
+	if err != nil {return Chirp{}, err}
+	
+	chirp := Chirp{
+		ID:			c.ID,
+		CreatedAt:	c.CreatedAt,
+		UpdatedAt:	c.UpdatedAt,
+		Body:		c.Body,
+		UserID:		c.UserID,
+	}
+
+	return chirp, nil
+}
+
+func dbChirpIntoChirpStruct(c database.Chirp) Chirp {
+	chirp := Chirp{
+		ID:			c.ID,
+		CreatedAt:	c.CreatedAt,
+		UpdatedAt:	c.UpdatedAt,
+		Body:		c.Body,
+		UserID:		c.UserID,
+	}
+
+	return chirp
 }
