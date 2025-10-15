@@ -22,4 +22,5 @@ func SetEndPoints(mux *http.ServeMux, cfg *apiConfig) {
 	mux.HandleFunc("POST /admin/reset", cfg.middlewareResetMetrics)
 	mux.HandleFunc("POST /api/users", cfg.CreateUser)
 	mux.HandleFunc("POST /api/chirps", cfg.chirps)
+	mux.HandleFunc("POST /api/login", cfg.login)
 }

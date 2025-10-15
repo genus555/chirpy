@@ -3,7 +3,8 @@ CREATE TABLE users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     updated_at TIMESTAMP NOT NULL DEFAULT now(),
-    email TEXT UNIQUE NOT NULL
+    email TEXT UNIQUE NOT NULL,
+    hashed_password TEXT NOT NULL
 );
 
 CREATE TRIGGER set_users_updated_at

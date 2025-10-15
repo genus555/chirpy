@@ -5,14 +5,18 @@ import (
 	"log"
 	"net/http"
 	"time"
+
 	"github.com/google/uuid"
+	"github.com/genus555/chirpy/internal/database"
+	"github.com/genus555/chirpy/internal/auth"
 )
 
 type User struct {
-	ID			uuid.UUID	`json:"id"`
-	CreatedAt	time.Time	`json:"created_at"`
-	UpdatedAt	time.Time	`json:"updated_at"`
-	Email		string		`json:"email"`
+	ID					uuid.UUID	`json:"id"`
+	CreatedAt			time.Time	`json:"created_at"`
+	UpdatedAt			time.Time	`json:"updated_at"`
+	Email				string		`json:"email"`
+	HashedPassword		string		`json:"hashed_password"`
 }
 
 type Chirp struct {
@@ -30,18 +34,34 @@ func (cfg *apiConfig) CreateUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
+	if req.Email == "" || req.Password == "" {
+		log.Printf("Error no password or email")
+		w.WriteHeader(400)
+		return
+	}
 
-	u, err := cfg.db.CreateUser(r.Context(), req.Email)
+	h_pswrd, err := auth.HashPassword(req.Password)
+	if err != nil {
+		log.Printf("Error hashing password: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	u, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{
+		Email:				req.Email,
+		HashedPassword:		h_pswrd,
+	})
 	if err != nil {
 		log.Printf("Error creating user: %s", err)
 		w.WriteHeader(500)
 		return
 	}
 	user := User{
-		ID:			u.ID,
-		CreatedAt:	u.CreatedAt,
-		UpdatedAt:	u.UpdatedAt,
-		Email:		u.Email,
+		ID:				u.ID,
+		CreatedAt:		u.CreatedAt,
+		UpdatedAt:		u.UpdatedAt,
+		Email:			u.Email,
+		HashedPassword:	u.HashedPassword,
 	}
 
 	data, err := EncodeJSON(&user)
@@ -161,4 +181,55 @@ func (cfg *apiConfig) getChirpByChirpID(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(200)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
+}
+
+func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
+	req, err := recievePostRequest(w, r)
+	if err != nil {
+		log.Printf("Error recieving request: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+	if req.Password == "" || req.Email == "" {
+		log.Printf("Missing password or email")
+		w.WriteHeader(400)
+		return
+	}
+
+	u, err := cfg.db.GetUserByEmail(r.Context(), req.Email)
+	if err != nil {
+		log.Printf("Error getting user information: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	ok, err := auth.CheckPasswordHash(req.Password, u.HashedPassword)
+	if err != nil {
+		log.Printf("Error checking password: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	user := User{
+		ID:			u.ID,
+		CreatedAt:	u.CreatedAt,
+		UpdatedAt:	u.UpdatedAt,
+		Email:		u.Email,
+	}
+
+	if !ok {
+		log.Printf("Incorrect email or password")
+		w.WriteHeader(401)
+	} else {
+		data, err := EncodeJSON(user)
+		if err != nil {
+			log.Printf("Error encoding user: %s")
+			w.WriteHeader(500)
+			return
+		}
+
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+	}
 }

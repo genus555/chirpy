@@ -6,7 +6,7 @@ import(
 	"fmt"
 	"encoding/json"
 	"strings"
-	"github.com/genus555/chirpy.git/internal/database"
+	"github.com/genus555/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {

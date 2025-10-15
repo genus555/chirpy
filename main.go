@@ -5,7 +5,8 @@ import _ "github.com/lib/pq"
 import (
 	//"fmt"
 	"github.com/joho/godotenv"
-	"github.com/genus555/chirpy.git/internal/database"
+	"github.com/genus555/chirpy/internal/database"
+	
 	"sync/atomic"
 	"os"
 	"log"
