@@ -4,7 +4,8 @@ CREATE TABLE users (
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     updated_at TIMESTAMP NOT NULL DEFAULT now(),
     email TEXT UNIQUE NOT NULL,
-    hashed_password TEXT NOT NULL
+    hashed_password TEXT NOT NULL,
+    token TEXT
 );
 
 CREATE TRIGGER set_users_updated_at

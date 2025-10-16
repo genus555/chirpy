@@ -7,13 +7,14 @@ import (
 )
 
 type PostRequest struct {
-		Body 		string 		`json:"body"`
-		CleanedBody string		`json:"cleaned_body"`
-		Error 		string 		`json:"error"`
-		Valid 		bool 		`json:"valid"`
-		Email		string		`json:"email"`
-		UserID		uuid.UUID	`json:"user_id"`
-		Password	string		`json:"password"`
+		Body 				string 		`json:"body"`
+		CleanedBody 		string		`json:"cleaned_body"`
+		Error 				string 		`json:"error"`
+		Valid 				bool 		`json:"valid"`
+		Email				string		`json:"email"`
+		UserID				uuid.UUID	`json:"user_id"`
+		Password			string		`json:"password"`
+		ExpiresInSeconds	int64		`json:"expires_in_seconds"`
 	}
 
 func launchServer(cfg *apiConfig) {

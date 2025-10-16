@@ -2,4 +2,4 @@ out
 debugger.go
 test.http
 .env
-testhttp/
+test/

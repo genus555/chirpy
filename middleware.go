@@ -6,7 +6,9 @@ import(
 	"fmt"
 	"encoding/json"
 	"strings"
+
 	"github.com/genus555/chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -74,10 +76,10 @@ func recievePostRequest(w http.ResponseWriter, r *http.Request) (PostRequest, er
 	return req, nil
 }
 
-func (cfg *apiConfig) recieveChirp(req PostRequest, r *http.Request) (Chirp, error) {
+func (cfg *apiConfig) recieveChirp(req PostRequest, r *http.Request, id uuid.UUID) (Chirp, error) {
 	c, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:		req.Body,
-		UserID:		req.UserID,
+		UserID:		id,
 	})
 	if err != nil {return Chirp{}, err}
 	

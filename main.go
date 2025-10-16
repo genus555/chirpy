@@ -15,11 +15,13 @@ import (
 
 type apiConfig struct {
 	fileserverHits	atomic.Int32
-	db			*database.Queries
+	db				*database.Queries
+	ts				string
 }
 func main() {
 	godotenv.Load()
 	dbURL := os.Getenv("DB_URL")
+	tokenSecret := os.Getenv("tokenSecret")
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -31,7 +33,8 @@ func main() {
 	initializeHits(&serverHits)
 	cfg := apiConfig{
 		fileserverHits: serverHits,
-		db:		dbQueries,
+		db:				dbQueries,
+		ts:	tokenSecret,
 	}
 	launchServer(&cfg);
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	//"fmt"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -16,7 +16,7 @@ type User struct {
 	CreatedAt			time.Time	`json:"created_at"`
 	UpdatedAt			time.Time	`json:"updated_at"`
 	Email				string		`json:"email"`
-	HashedPassword		string		`json:"hashed_password"`
+	Token				string		`json:"token"`
 }
 
 type Chirp struct {
@@ -61,7 +61,6 @@ func (cfg *apiConfig) CreateUser(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:		u.CreatedAt,
 		UpdatedAt:		u.UpdatedAt,
 		Email:			u.Email,
-		HashedPassword:	u.HashedPassword,
 	}
 
 	data, err := EncodeJSON(&user)
@@ -77,6 +76,20 @@ func (cfg *apiConfig) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error retrieving token: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+
+	uID, err := auth.ValidateJWT(token, cfg.ts)
+	if err != nil {
+		log.Printf("Token invalid: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+
 	req, err := recievePostRequest(w, r)
 	if err != nil {
 		log.Printf("Error recieving request: %s", err)
@@ -109,7 +122,7 @@ func (cfg *apiConfig) chirps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chirp, err := cfg.recieveChirp(req, r)
+	chirp, err := cfg.recieveChirp(req, r, uID)
 	if err != nil {
 		log.Printf("Error reicieving chirp: %s", err)
 		w.WriteHeader(500)
@@ -185,6 +198,7 @@ func (cfg *apiConfig) getChirpByChirpID(w http.ResponseWriter, r *http.Request) 
 
 func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 	req, err := recievePostRequest(w, r)
+	//check to see if request has all necessary fields
 	if err != nil {
 		log.Printf("Error recieving request: %s", err)
 		w.WriteHeader(500)
@@ -196,6 +210,15 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//set token duration
+	duration, _ := time.ParseDuration("0s")
+	if req.ExpiresInSeconds == 0 {
+		duration, _ = time.ParseDuration("1h")
+	} else {
+		duration, _ = time.ParseDuration(fmt.Sprintf("%ds", req.ExpiresInSeconds))
+	}
+
+	//get user from email
 	u, err := cfg.db.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		log.Printf("Error getting user information: %s", err)
@@ -203,6 +226,7 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//check password
 	ok, err := auth.CheckPasswordHash(req.Password, u.HashedPassword)
 	if err != nil {
 		log.Printf("Error checking password: %s", err)
@@ -210,20 +234,42 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//create token
+	token, err := auth.MakeJWT(u.ID, cfg.ts, duration)
+	if err != nil {
+		log.Printf("Error getting token: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	//update user with token
+	err = cfg.db.AddUserToken(r.Context(), database.AddUserTokenParams{
+		ID:		u.ID,
+		Token:	token,
+	})
+	if err != nil {
+		log.Printf("Error giving user token: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	//populate User struct
 	user := User{
 		ID:			u.ID,
 		CreatedAt:	u.CreatedAt,
 		UpdatedAt:	u.UpdatedAt,
 		Email:		u.Email,
+		Token:		token,
 	}
 
+	//if all is right login
 	if !ok {
 		log.Printf("Incorrect email or password")
 		w.WriteHeader(401)
 	} else {
 		data, err := EncodeJSON(user)
 		if err != nil {
-			log.Printf("Error encoding user: %s")
+			log.Printf("Error encoding user: %s", err)
 			w.WriteHeader(500)
 			return
 		}
