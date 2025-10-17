@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"log"
 	"net/http"
 	"time"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/genus555/chirpy/internal/database"
@@ -17,6 +18,7 @@ type User struct {
 	UpdatedAt			time.Time	`json:"updated_at"`
 	Email				string		`json:"email"`
 	Token				string		`json:"token"`
+	RefreshToken		string		`json:"refresh_token"`
 }
 
 type Chirp struct {
@@ -210,13 +212,8 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//set token duration
-	duration, _ := time.ParseDuration("0s")
-	if req.ExpiresInSeconds == 0 {
-		duration, _ = time.ParseDuration("1h")
-	} else {
-		duration, _ = time.ParseDuration(fmt.Sprintf("%ds", req.ExpiresInSeconds))
-	}
+	//set access token duration
+	duration, _ := time.ParseDuration("1h")
 
 	//get user from email
 	u, err := cfg.db.GetUserByEmail(r.Context(), req.Email)
@@ -242,7 +239,7 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//update user with token
+	//update user with access token
 	err = cfg.db.AddUserToken(r.Context(), database.AddUserTokenParams{
 		ID:		u.ID,
 		Token:	token,
@@ -253,13 +250,30 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//set refresh token duration
+	duration, _ = time.ParseDuration("60d")
+
+	//add refresh token to database
+	r_token, err := auth.MakeRefreshToken()
+	if err != nil {
+		log.Printf("Error creating refresh token: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+	rt, err := cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:		r_token,
+		UserID:		u.ID,
+		ExpiresAt:	time.Now().Add(duration),
+	})
+
 	//populate User struct
 	user := User{
-		ID:			u.ID,
-		CreatedAt:	u.CreatedAt,
-		UpdatedAt:	u.UpdatedAt,
-		Email:		u.Email,
-		Token:		token,
+		ID:				u.ID,
+		CreatedAt:		u.CreatedAt,
+		UpdatedAt:		u.UpdatedAt,
+		Email:			u.Email,
+		Token:			token,
+		RefreshToken:	rt.Token,
 	}
 
 	//if all is right login
@@ -278,4 +292,107 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 	}
+}
+
+func (cfg *apiConfig) refresh(w http.ResponseWriter, r *http.Request) {
+	r_token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting refresh token: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+	if r_token == "" {
+		log.Printf("No refresh token located: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	rt, err := cfg.db.GetRefreshToken(r.Context(), r_token)
+	if err != nil {
+		log.Printf("Error getting refresh token from database: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+
+	if rt.RevokedAt.Valid {
+		log.Printf("Refresh token has been revoked")
+		w.WriteHeader(401)
+		return
+	}
+
+	expired := time.Now().Before(rt.ExpiresAt)
+
+	if expired {
+		log.Printf("Token has expired")
+		w.WriteHeader(401)
+		return
+	} else {
+		id, err := cfg.db.GetUserIDFromRefreshToken(r.Context(), rt.Token)
+		if err != nil {
+			log.Printf("Error finding user from token: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		duration, _ := time.ParseDuration("1h")
+		new_token, err := auth.MakeJWT(id, cfg.ts, duration)
+
+		err = cfg.db.AddUserToken(r.Context(), database.AddUserTokenParams{
+			ID:			id,
+			Token:		new_token,
+		})
+		if err != nil {
+			log.Printf("Error giving user new token: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		type Token struct {
+			Token	string	`json:"token"`
+		}
+		access_token := Token{
+			Token:		new_token,
+		}
+
+		data, err := EncodeJSON(access_token)
+		if err != nil {
+			log.Printf("Error encoding new access token: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
+	}
+}
+
+func (cfg *apiConfig) revoke(w http.ResponseWriter, r *http.Request) {
+	r_token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting refresh token: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+	if r_token == "" {
+		log.Printf("No refresh token located: %s", err)
+		w.WriteHeader(404)
+		return
+	}
+
+	revoked := sql.NullTime{
+		Time:	time.Now(),
+		Valid:	true,
+	}
+	err = cfg.db.RevokeRefreshToken(r.Context(), database.RevokeRefreshTokenParams{
+		RevokedAt:		revoked,
+		Token:			r_token,
+	})
+	if err != nil {
+		log.Printf("Error revoking token: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	w.WriteHeader(204)
 }

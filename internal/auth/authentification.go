@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"crypto/rand"
+	"encoding/hex"
 )
 
 func HashPassword(pswrd string) (string, error) {
@@ -67,4 +69,12 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	return token, nil
+}
+
+func MakeRefreshToken() (string, error) {
+	key := make([]byte, 32)
+	rand.Read(key)
+
+	hex_str := hex.EncodeToString(key)
+	return hex_str, nil
 }
