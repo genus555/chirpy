@@ -25,4 +25,7 @@ func SetEndPoints(mux *http.ServeMux, cfg *apiConfig) {
 	mux.HandleFunc("POST /api/login", cfg.login)
 	mux.HandleFunc("POST /api/refresh", cfg.refresh)
 	mux.HandleFunc("POST /api/revoke", cfg.revoke)
+
+	//PUT
+	mux.HandleFunc("PUT /api/users", cfg.UpdateUser)
 }

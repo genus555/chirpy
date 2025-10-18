@@ -238,11 +238,12 @@ func (cfg *apiConfig) login(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
+	nullToken := sql.NullString{String: token, Valid: true}
 
 	//update user with access token
 	err = cfg.db.AddUserToken(r.Context(), database.AddUserTokenParams{
 		ID:		u.ID,
-		Token:	token,
+		Token:	nullToken,
 	})
 	if err != nil {
 		log.Printf("Error giving user token: %s", err)
@@ -336,10 +337,11 @@ func (cfg *apiConfig) refresh(w http.ResponseWriter, r *http.Request) {
 
 		duration, _ := time.ParseDuration("1h")
 		new_token, err := auth.MakeJWT(id, cfg.ts, duration)
+		nullToken := sql.NullString{String: new_token, Valid: true}
 
 		err = cfg.db.AddUserToken(r.Context(), database.AddUserTokenParams{
 			ID:			id,
-			Token:		new_token,
+			Token:		nullToken,
 		})
 		if err != nil {
 			log.Printf("Error giving user new token: %s", err)
@@ -395,4 +397,58 @@ func (cfg *apiConfig) revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(204)
+}
+
+func (cfg *apiConfig) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting token: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+
+	nullToken := sql.NullString{String: token, Valid: true}
+	u, err := cfg.db.GetUserFromToken(r.Context(), nullToken)
+	if err != nil {
+		log.Printf("Error getting user: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+	
+	req, err := recievePostRequest(w, r)
+	if err != nil {
+		log.Printf("Error recieving request: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+	if req.Password == "" || req.Email == "" {
+		log.Printf("Missing password or email")
+		w.WriteHeader(400)
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		log.Printf("Error hashing new password: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	updated_user, err := cfg.db.UpdateUserByID(r.Context(), database.UpdateUserByIDParams{
+		Email:				req.Email,
+		HashedPassword:		hash,
+		ID:					u.ID,
+	})
+
+	user := dbUserIntoUserStruct(updated_user)
+	data, err := EncodeJSON(user)
+	if err != nil {
+		log.Printf("Error encoding updated user: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
 }

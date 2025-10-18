@@ -105,3 +105,14 @@ func dbChirpIntoChirpStruct(c database.Chirp) Chirp {
 
 	return chirp
 }
+
+func dbUserIntoUserStruct(u database.User) User {
+	user := User{
+		ID:				u.ID,
+		CreatedAt:		u.CreatedAt,
+		UpdatedAt:		u.UpdatedAt,
+		Email:			u.Email,
+	}
+
+	return user
+}

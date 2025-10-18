@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 )
@@ -19,7 +20,7 @@ WHERE id = $1
 
 type AddUserTokenParams struct {
 	ID    uuid.UUID
-	Token string
+	Token sql.NullString
 }
 
 func (q *Queries) AddUserToken(ctx context.Context, arg AddUserTokenParams) error {
