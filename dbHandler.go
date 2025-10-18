@@ -452,3 +452,54 @@ func (cfg *apiConfig) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
 }
+
+func (cfg *apiConfig) DeleteChirp(w http.ResponseWriter, r *http.Request) {
+	//check for token
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting token: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+
+	//get user from token
+	nullToken := sql.NullString{String: token, Valid: true}
+	u, err := cfg.db.GetUserFromToken(r.Context(), nullToken)
+	if err != nil {
+		log.Printf("Error getting user: %s", err)
+		w.WriteHeader(401)
+		return
+	}
+
+	//get request's chirp_id
+	id_from_path := r.PathValue("chirp_id")
+	chirp_id, err := uuid.Parse(id_from_path)
+	if err != nil {
+		log.Printf("Error getting chirp id: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	//get chirp from chirp_id
+	chirp, err := cfg.db.GetChirpByChirpId(r.Context(), chirp_id)
+	if err != nil {
+		log.Printf("Error getting chirp: %s", err)
+		w.WriteHeader(404)
+		return
+	}
+
+	if chirp.UserID != u.ID {
+		log.Printf("Incorrect user")
+		w.WriteHeader(403)
+		return
+	}
+
+	err = cfg.db.DeleteChirp(r.Context(), chirp.ID)
+	if err != nil {
+		log.Printf("Error deleteing chirp: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	w.WriteHeader(204)
+}

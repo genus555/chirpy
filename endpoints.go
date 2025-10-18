@@ -12,12 +12,6 @@ func SetEndPoints(mux *http.ServeMux, cfg *apiConfig) {
 	mux.Handle("/app/assets/",
 	cfg.middlewareMetricsInc(http.StripPrefix("/app/assets/", http.FileServer(http.Dir("./assets")))))
 	
-	//GET
-	mux.HandleFunc("GET /admin/metrics", cfg.middlewarePrintMetrics)
-	mux.HandleFunc("GET /api/healthz", muxHandler)
-	mux.HandleFunc("GET /api/chirps", cfg.getChirps)
-	mux.HandleFunc("GET /api/chirps/{chirp_id}", cfg.getChirpByChirpID)
-
 	//POST
 	mux.HandleFunc("POST /admin/reset", cfg.middlewareResetMetrics)
 	mux.HandleFunc("POST /api/users", cfg.CreateUser)
@@ -26,6 +20,15 @@ func SetEndPoints(mux *http.ServeMux, cfg *apiConfig) {
 	mux.HandleFunc("POST /api/refresh", cfg.refresh)
 	mux.HandleFunc("POST /api/revoke", cfg.revoke)
 
+	//GET
+	mux.HandleFunc("GET /admin/metrics", cfg.middlewarePrintMetrics)
+	mux.HandleFunc("GET /api/healthz", muxHandler)
+	mux.HandleFunc("GET /api/chirps", cfg.getChirps)
+	mux.HandleFunc("GET /api/chirps/{chirp_id}", cfg.getChirpByChirpID)
+
 	//PUT
 	mux.HandleFunc("PUT /api/users", cfg.UpdateUser)
+
+	//DELETE
+	mux.HandleFunc("DELETE /api/chirps/{chirp_id}", cfg.DeleteChirp)
 }
